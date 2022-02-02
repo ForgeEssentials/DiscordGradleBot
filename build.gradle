@@ -68,7 +68,7 @@ task publishToDiscord() {
 				for (int i = 0; i < sections.size(); i++) {
 
 					Mono cur = channel.createMessage()
-							.withContent("${name}.zip part ${i+1} build for Ref $githubRef")
+							.withContent("Forge Essentials build for Ref\\: `$githubRef` part ${i+1}")
 							.withFiles(MessageCreateFields.File.of(name + ".zip.${String.format("%03d", i+1)}", sections[i]))
 					if (prev != null) {
 						prev = prev.then().and(cur)
