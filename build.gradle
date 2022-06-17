@@ -78,13 +78,13 @@ task publishToDiscord() {
 						println("Error sending Message")
 					})
 					if (prev != null) {
-						prev = prev.then().and(cur)
+						prev = prev.then(cur)
 					} else {
 						prev = cur
 					}
 				}
 				return prev
-			}).then().subscribe()
+			})
 		}
 		login.block()
 		println("Message Sent")
