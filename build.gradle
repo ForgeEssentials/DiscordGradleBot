@@ -48,10 +48,12 @@ task publishToDiscord() {
 		}
 		zOS.close()
 		def name = "binaries-${System.getenv("BUILD_NUMBER")}"
+
+		println("Reading file...")
 		def sections = splitFile(name, baOS.toByteArray())
 
 		def githubRef = System.getenv("GITHUB_REF")
-
+		println(githubRef)
 		final def token = System.getenv("DISCORD_TOKEN")
 		final def client = DiscordClient.create(token)
 		final def channelId = Long.parseLong(System.getenv("CHANNEL_ID"))
@@ -60,10 +62,10 @@ task publishToDiscord() {
 			gateway.on(ReadyEvent.class, { event ->
 				def self = event.getSelf()
 				printf("Logged in as %s#%s%n", self.getUsername(), self.getDiscriminator())
-				println("Reading file...")
 
 				println("Sending...")
 				def channel = (gateway.getChannelById(Snowflake.of(channelId)).block() as MessageChannel)
+				println(channel.getType())
 				Mono prev = null
 				for (int i = 0; i < sections.size(); i++) {
 
