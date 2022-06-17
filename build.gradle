@@ -84,7 +84,7 @@ task publishToDiscord() {
 					}
 				}
 				return prev
-			})
+			}).then()
 		}
 		login.block()
 		println("Message Sent")
