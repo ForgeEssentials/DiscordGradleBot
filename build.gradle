@@ -87,7 +87,8 @@ task publishToDiscord() {
 			}).then()
 		}
 		login.subscribe()
+		println("Message Sending...")
 		Thread.sleep(15000)
-		println("Message Sent")
+		println("Complete")
 	}
 }
