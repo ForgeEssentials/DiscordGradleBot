@@ -73,12 +73,12 @@ task publishToDiscord() {
 					println(content)
 					Mono cur = channel.createMessage()
 							.withContent(content)
-							.withFiles(MessageCreateFields.File.of(name + ".zip.${String.format("%03d", i+1)}", sections[i]))
+							.withFiles(MessageCreateFields.File.of(name + ".zip.${String.format("%03d", i+1)}", sections[i])).then()
 					cur.doOnError({ error ->
 						println("Error sending Message")
 					})
 					if (prev != null) {
-						prev = prev.then(cur)
+						prev += cur
 					} else {
 						prev = cur
 					}
