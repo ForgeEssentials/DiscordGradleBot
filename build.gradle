@@ -74,9 +74,6 @@ task publishToDiscord() {
 					Mono cur = channel.createMessage()
 							.withContent(content)
 							.withFiles(MessageCreateFields.File.of(name + ".zip.${String.format("%03d", i+1)}", sections[i]))
-					cur.doOnError({ error ->
-						println("Error sending ${content}")
-					})
 
 					if (prev != null) {
 						prev = prev.then().and(cur)
@@ -87,7 +84,9 @@ task publishToDiscord() {
 				return prev
 			}).then()
 		}
-		login.subscribe()
+		login.doOnError({ error ->
+			println("Error sending Message")
+		}).subscribe().wait()
 		println("Message Sent")
 	}
 }
