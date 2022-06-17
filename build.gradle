@@ -78,7 +78,7 @@ task publishToDiscord() {
 						println("Error sending Message")
 					})
 					if (prev != null) {
-						prev += cur
+						prev &= cur
 					} else {
 						prev = cur
 					}
