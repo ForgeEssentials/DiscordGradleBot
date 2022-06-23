@@ -52,7 +52,7 @@ task publishToDiscord() {
 		println("Reading file...")
 		def sections = splitFile(name, baOS.toByteArray())
 
-		def githubRef = System.getenv("GITHUB_REF")
+		def githubRef = System.getenv("WORKFLOW_GITHUB_REF")
 		println(githubRef)
 		final def token = System.getenv("DISCORD_TOKEN")
 		final def client = DiscordClient.create(token)
