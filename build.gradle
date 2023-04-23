@@ -56,7 +56,12 @@ task publishToDiscord() {
 		println(githubRef)
 		final def token = System.getenv("DISCORD_TOKEN")
 		final def client = DiscordClient.create(token)
-		final def channelId = Long.parseLong(System.getenv("CHANNEL_ID"))
+        final def channelId;
+        if (System.getenv("BUILD_NUMBER").startsWith("UNOFFICIAL")) {
+            channelId = Long.parseLong(System.getenv("DEV_BUILD_CHANNEL_ID"))
+        } else {
+            channelId = Long.parseLong(System.getenv("RELEASE_CHANNEL_ID"))
+        }
 		println("ChannelId: $channelId")
 		def login = client.withGateway { gateway ->
 			gateway.on(ReadyEvent.class, { event ->
