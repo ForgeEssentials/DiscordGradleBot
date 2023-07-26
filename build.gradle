@@ -50,7 +50,7 @@ task publishToDiscord() {
 		def name = "binaries-${System.getenv("BUILD_NUMBER")}"
 
 		println("Reading file...")
-		def sections = splitFile(name, baOS.toByteArray())
+		def sections = splitFile(name, baOS.toByteArray(), 25600)
 
 		def githubRef = System.getenv("WORKFLOW_GITHUB_REF")
 		println(githubRef)
