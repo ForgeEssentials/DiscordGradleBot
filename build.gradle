@@ -18,6 +18,8 @@ import reactor.core.publisher.Mono
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+def discordFileLimit = 25600;
+
 def splitFile(String name, byte[] file, int maxSize=8192) {
 	int parts = (int) Math.ceil((float) file.size() / (1024 * maxSize))
 	ByteArrayInputStream[] sections = new ByteArrayInputStream[parts]
@@ -40,17 +42,35 @@ def splitFile(String name, byte[] file, int maxSize=8192) {
 }
 task publishToDiscord() {
 	doFirst {
-		ByteArrayOutputStream baOS = new ByteArrayOutputStream()
-		ZipOutputStream zOS = new ZipOutputStream(baOS)
-		fileTree("../build/libs").each {
-			zOS.putNextEntry(new ZipEntry(it.name))
-			zOS.write(it.readBytes())
-		}
-		zOS.close()
-		def name = "binaries-${System.getenv("BUILD_NUMBER")}"
+        boolean zipFiles = false;
+        def files = new ArrayList<File>()
+        fileTree("../build/libs").each {
+            if (it.size() > discordFileLimit) {
+                zipFiles = false
+            }
+            files.add(it)
+        }
+        String name
+        InputStream[] sections
+        if (zipFiles) {
+            ByteArrayOutputStream baOS = new ByteArrayOutputStream()
+            ZipOutputStream zOS = new ZipOutputStream(baOS)
+            fileTree("../build/libs").each {
+                zOS.putNextEntry(new ZipEntry(it.name))
+                zOS.write(it.readBytes())
+            }
+            zOS.close()
+            name = "binaries-${System.getenv("BUILD_NUMBER")}"
 
-		println("Reading file...")
-		def sections = splitFile(name, baOS.toByteArray(), 25600)
+            println("Reading file...")
+            sections = splitFile(name, baOS.toByteArray(), discordFileLimit)
+
+        } else {
+            sections = new BufferedInputStream[files.size()]
+            for (int i = 0; i < files.size(); i++) {
+                sections[i] = files[i].newInputStream()
+            }
+        }
 
 		def githubRef = System.getenv("WORKFLOW_GITHUB_REF")
 		println(githubRef)
@@ -76,9 +96,15 @@ task publishToDiscord() {
 
 					def content = "Forge Essentials build for Ref\\: `$githubRef` part ${i+1}"
 					println(content)
+                    String archiveName
+                    if (zipFiles) {
+                        archiveName = name + ".zip.${String.format("%03d", i + 1)}";
+                    } else {
+                        archiveName = files[i].name;
+                    }
 					Mono cur = channel.createMessage()
 							.withContent(content)
-							.withFiles(MessageCreateFields.File.of(name + ".zip.${String.format("%03d", i+1)}", sections[i])).then()
+							.withFiles(MessageCreateFields.File.of(archiveName, sections[i])).then()
 					cur.doOnError({ error ->
 						println("Error sending Message")
 					})
