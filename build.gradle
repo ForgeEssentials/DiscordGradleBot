@@ -45,8 +45,8 @@ task publishToDiscord() {
         boolean zipFiles = false;
         def files = new ArrayList<File>()
         fileTree("../build/libs").each {
-            if (it.size() > discordFileLimit) {
-                zipFiles = false
+            if (it.size() > discordFileLimit*1024) {
+                zipFiles = true
             }
             files.add(it)
         }
