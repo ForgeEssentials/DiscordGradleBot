@@ -94,9 +94,9 @@ task publishToDiscord() {
 				Mono prev = null
 				for (int i = 0; i < sections.size(); i++) {
 
-                    String archiveName = zipFiles ? name + ".zip.${String.format("%03d", i + 1)}" : files[i].name
+                    String archiveName = zipFiles ? name + ".zip${sections.size() > 1 ? ".${String.format("%03d", i + 1)}" : ""}" : files[i].name
 
-					def content = "Forge Essentials build for Ref\\: `$githubRef` ${ zipFiles ? "part ${i+1}" : "; $archiveName"}"
+					def content = "Forge Essentials build for Ref\\: `$githubRef` ${ zipFiles && sections.size() > 1 ? "part ${i+1}" : "; $archiveName"}"
 					println(content)
 					Mono cur = channel.createMessage()
 							.withContent(content)
