@@ -71,7 +71,7 @@ task publishToDiscord() {
         def thirdParty = org != 'ForgeEssentials'
 		println("$org : $githubRef")
 		final def token = System.getenv("DISCORD_TOKEN")
-		final def client = DiscordClient.create(token).gateway().setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS))
+		final def client = DiscordClient.create(token)
         final def channelId;
         if (System.getenv("BUILD_NUMBER").startsWith("UNOFFICIAL")) {
             channelId = Long.parseLong(System.getenv("DEV_BUILD_CHANNEL_ID"))
@@ -90,7 +90,6 @@ task publishToDiscord() {
                 def channel = null
 
                 def guildID = Snowflake.of(tmp.data.guildId().get())
-                def member = self.asMember(guildID).block()
                 if (tmp instanceof ForumChannel) {
                     def threads = gateway.getGuildById(guildID).block().getActiveThreads().block().threads
                     def threadName = (thirdParty ? org + " -- " : "") + githubRef.split("/", 2)[1]
