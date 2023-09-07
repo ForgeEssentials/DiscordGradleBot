@@ -4,23 +4,27 @@ buildscript {
 	}
 
 	dependencies {
-		classpath "com.discord4j:discord4j-core:3.2.1"
+		classpath "com.discord4j:discord4j-core:3.3.0-RC1"
 	}
 }
-
 import discord4j.common.util.Snowflake
 import discord4j.core.DiscordClient
 import discord4j.core.event.domain.lifecycle.ReadyEvent
 import discord4j.core.object.entity.channel.MessageChannel
+import discord4j.core.object.entity.channel.ForumChannel
+import discord4j.core.spec.ForumThreadMessageCreateSpec
 import discord4j.core.spec.MessageCreateFields
+import discord4j.core.spec.StartThreadInForumChannelSpec
 import reactor.core.publisher.Mono
+import discord4j.gateway.intent.Intent;
+import discord4j.gateway.intent.IntentSet
 
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 def discordFileLimit = 25600;
 
-def splitFile(String name, byte[] file, int maxSize=8192) {
+def splitFile(byte[] file, int maxSize=8192) {
 	int parts = (int) Math.ceil((float) file.size() / (1024 * maxSize))
 	ByteArrayInputStream[] sections = new ByteArrayInputStream[parts]
 	printf("Parts: %s\n", parts)
@@ -42,40 +46,32 @@ def splitFile(String name, byte[] file, int maxSize=8192) {
 }
 task publishToDiscord() {
 	doFirst {
-        boolean zipFiles = false;
         def files = new ArrayList<File>()
+        def sections = new ArrayList<InputStream[]>()
         fileTree("../build/libs").each {
             if (it.size() > discordFileLimit*1024) {
-                zipFiles = true
+
+                ByteArrayOutputStream baOS = new ByteArrayOutputStream()
+                ZipOutputStream zOS = new ZipOutputStream(baOS)
+                zOS.putNextEntry(new ZipEntry(it.name))
+                zOS.write(it.readBytes())
+                zOS.close()
+
+                sections.add(splitFile(baOS.toByteArray(), discordFileLimit))
+            } else {
+                def section = new InputStream[1]
+                section[0] = it.newInputStream()
+                sections.add(section)
             }
             files.add(it)
         }
-        String name
-        InputStream[] sections
-        if (zipFiles) {
-            ByteArrayOutputStream baOS = new ByteArrayOutputStream()
-            ZipOutputStream zOS = new ZipOutputStream(baOS)
-            fileTree("../build/libs").each {
-                zOS.putNextEntry(new ZipEntry(it.name))
-                zOS.write(it.readBytes())
-            }
-            zOS.close()
-            name = "binaries-${System.getenv("BUILD_NUMBER")}"
-
-            println("Reading file...")
-            sections = splitFile(name, baOS.toByteArray(), discordFileLimit)
-
-        } else {
-            sections = new BufferedInputStream[files.size()]
-            for (int i = 0; i < files.size(); i++) {
-                sections[i] = files[i].newInputStream()
-            }
-        }
-
-		def githubRef = System.getenv("WORKFLOW_GITHUB_REF")
-		println(githubRef)
+		def fullRef = System.getenv("WORKFLOW_GITHUB_REF").split("/", 2)
+        def org = fullRef[0]
+        def githubRef = fullRef[1]
+        def thirdParty = org != 'ForgeEssentials'
+		println("$org : $githubRef")
 		final def token = System.getenv("DISCORD_TOKEN")
-		final def client = DiscordClient.create(token)
+		final def client = DiscordClient.create(token).gateway().setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS))
         final def channelId;
         if (System.getenv("BUILD_NUMBER").startsWith("UNOFFICIAL")) {
             channelId = Long.parseLong(System.getenv("DEV_BUILD_CHANNEL_ID"))
@@ -89,26 +85,48 @@ task publishToDiscord() {
 				printf("Logged in as %s#%s%n", self.getUsername(), self.getDiscriminator())
 
 				println("Sending...")
-				def channel = (gateway.getChannelById(Snowflake.of(channelId)).block() as MessageChannel)
+
+				def tmp = gateway.getChannelById(Snowflake.of(channelId)).block()
+                def channel = null
+
+                def guildID = Snowflake.of(tmp.data.guildId().get())
+                def member = self.asMember(guildID).block()
+                if (tmp instanceof ForumChannel) {
+                    def threads = gateway.getGuildById(guildID).block().getActiveThreads().block().threads
+                    def threadName = (thirdParty ? org + " -- " : "") + githubRef.split("/", 2)[1]
+                    channel = threads.find{ it.name == threadName && it.parentId.get() == tmp.getId()}
+
+                    if (channel == null) {
+                        channel = tmp.startThread ( StartThreadInForumChannelSpec.builder().name(threadName).message(ForumThreadMessageCreateSpec.builder().content("Builds for Ref: $githubRef").build()).build() ).block()
+                    }
+                } else {
+                    channel = tmp as MessageChannel
+
+                }
 				println(channel.getType())
 				Mono prev = null
 				for (int i = 0; i < sections.size(); i++) {
+                    boolean zipFiles = sections[i].size() > 1 || sections[i][0] instanceof ByteArrayInputStream
+                    for (int j = 0; j < sections[i].size(); j++) {
+                        String archiveName = files[i].name
+                        if (zipFiles) {
+                          archiveName += ".zip${sections[i].size() > 1 ? ".${String.format("%03d", j + 1)}" : ""}"
+                        }
 
-                    String archiveName = zipFiles ? name + ".zip${sections.size() > 1 ? ".${String.format("%03d", i + 1)}" : ""}" : files[i].name
-
-					def content = "Forge Essentials build for Ref\\: `$githubRef` ${ zipFiles && sections.size() > 1 ? "part ${i+1}" : "-- `$archiveName`"}"
-					println(content)
-					Mono cur = channel.createMessage()
-							.withContent(content)
-							.withFiles(MessageCreateFields.File.of(archiveName, sections[i])).then()
-					cur.doOnError({ error ->
-						println("Error sending Message")
-					})
-					if (prev != null) {
-						prev &= cur
-					} else {
-						prev = cur
-					}
+                        def content = "Forge Essentials build for${thirdParty ? " Third Party: `$org` --" : ""} Ref\\: `$githubRef` -- `$archiveName`"
+                        println(content)
+                        Mono cur = channel.createMessage()
+                                .withContent(content)
+                                .withFiles(MessageCreateFields.File.of(archiveName, sections[i][j])).then()
+                        cur.doOnError({ error ->
+                            println("Error sending Message")
+                        })
+                        if (prev != null) {
+                            prev &= cur
+                        } else {
+                            prev = cur
+                        }
+                    }
 				}
 				return prev
 			}).then()
