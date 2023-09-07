@@ -97,7 +97,14 @@ task publishToDiscord() {
                     channel = threads.find{ it.name == threadName && it.parentId.get() == tmp.getId()}
 
                     if (channel == null) {
-                        channel = tmp.startThread ( StartThreadInForumChannelSpec.builder().name(threadName).message(ForumThreadMessageCreateSpec.builder().content("Builds for Ref: $githubRef").build()).build() ).block()
+                        channel = tmp.startThread ( StartThreadInForumChannelSpec.builder()
+                                .name(threadName)
+                                .addAppliedTag(tmp.availableTags.find {it.name == "Build"}.id)
+                                .message(ForumThreadMessageCreateSpec.builder()
+                                        .content("Builds for Ref: $githubRef")
+                                        .build())
+                                .build()
+                        ).block()
                     }
                 } else {
                     channel = tmp as MessageChannel
