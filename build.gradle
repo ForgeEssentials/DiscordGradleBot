@@ -67,7 +67,7 @@ class FixRestChannel {
                                         final Instant startAt, final boolean reverse) {
 
         final ToLongFunction<List<T>> updateLast = { list ->
-            list.isEmpty() ? startAt : keyExtractor.applyAsLong(list.get(list.size() - 1));
+            list.isEmpty() ? startAt : keyExtractor.applyAsInstant(list.get(list.size() - 1));
         }
 
         final Comparator<T> comparator = comparingInstant(keyExtractor);
