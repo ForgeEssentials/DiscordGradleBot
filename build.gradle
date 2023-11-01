@@ -83,7 +83,7 @@ class FixRestChannel {
     }
 
     static Flux<ListThreadsData> getPublicArchivedThreads(RestChannel self) {
-        listThreads(params -> self.restClient.getChannelService().listPublicArchivedThreads(self.&id, params));
+        listThreads{params -> self.restClient.getChannelService().listPublicArchivedThreads(self.&id, params)};
     }
 }
 
