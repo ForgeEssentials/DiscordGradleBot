@@ -85,7 +85,7 @@ class FixRestChannel {
     private static Flux<ListThreadsData> listThreads(Function<Map<String, Object>, Mono<ListThreadsData>> doRequest) {
         ToInstantFunction<ListThreadsData> getLastThreadId = { response ->
             List<ChannelData> threads = response.threads();
-            return threads.isEmpty() ? Long.MAX_VALUE : Snowflake.asLong(threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp());
+            return threads.isEmpty() ? Instant.ofEpochSecond(0) : threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp();
         }
         final InstantFunction<Flux<ListThreadsData>> nextPage = { long s, long n ->
             final Map<String, Object> parameters = new HashMap<>(2);
