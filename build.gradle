@@ -23,9 +23,11 @@ import reactor.core.publisher.Mono
 import discord4j.core.object.ThreadListPart
 
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.function.Function
 import java.util.function.LongFunction
+import java.util.function.ToIntFunction
 import java.util.function.ToLongFunction;
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -70,18 +72,18 @@ class FixRestChannel {
             list.isEmpty() ? startAt : keyExtractor.applyAsInstant(list.get(list.size() - 1)).getEpochSecond()
         }
 
-        final ToLongFunction<List<T>> updateLast_ns = { list ->
+        final ToIntFunction<List<T>> updateLast_ns = { list ->
             list.isEmpty() ? startAt : keyExtractor.applyAsInstant(list.get(list.size() - 1)).getNano()
         }
 
         final Comparator<T> comparator = comparingInstant(keyExtractor);
         final AtomicLong previousStart = new AtomicLong(startAt.getEpochSecond());
-        final AtomicLong previousStart_ns = new AtomicLong(startAt.getNano());
+        final AtomicInteger previousStart_ns = new AtomicLong(startAt.getNano());
 
         return Flux.defer { nextPage.apply(previousStart.get(), previousStart_ns.get()) }
                 .sort(reverse ? comparator.reversed() : comparator)
                 .collectList()
-                .doOnNext{list -> previousStart.set(updateLast.applyAsLong(list)); previousStart_ns.set(updateLast_ns.applyAsLong(list)) }
+                .doOnNext{list -> previousStart.set(updateLast.applyAsLong(list)); previousStart_ns.set(updateLast_ns.applyAsInt(list)) }
                 .flatMapMany(Flux.&fromIterable)
                 .repeat { previousStart.get() != startAt.getEpochSecond() && previousStart_ns.get() != startAt.getNano() };
     }
