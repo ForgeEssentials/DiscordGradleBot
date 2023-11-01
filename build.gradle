@@ -44,17 +44,33 @@ interface InstantFunction<R> {
     R apply(long s, long n)
 }
 
+@FunctionalInterface
+public interface ToInstantFunction<T> {
+
+    /**
+     * Applies this function to the given argument.
+     *
+     * @param value the function argument
+     * @return the function result
+     */
+    Instant applyAsInstant(T value);
+}
 
 class FixRestChannel {
 
-    private static <T> Flux<T> paginate(final InstantFunction<Flux<T>> nextPage, final ToLongFunction<T> keyExtractor,
+    static <T> Comparator<T> comparingInstant(ToInstantFunction<? super T> keyExtractor) {
+        Objects.requireNonNull(keyExtractor);
+        return {c1, c2 -> (keyExtractor.applyAsInstant(c1) <=> keyExtractor.applyAsInstant(c2)) }
+    }
+
+    private static <T> Flux<T> paginate(final InstantFunction<Flux<T>> nextPage, final ToInstantFunction<T> keyExtractor,
                                         final Instant startAt, final boolean reverse) {
 
         final ToLongFunction<List<T>> updateLast = { list ->
             list.isEmpty() ? startAt : keyExtractor.applyAsLong(list.get(list.size() - 1));
         }
 
-        final Comparator<T> comparator = Comparator.comparingLong(keyExtractor);
+        final Comparator<T> comparator = comparingInstant(keyExtractor);
         final AtomicLong previousStart = new AtomicLong(startAt.getEpochSecond());
         final AtomicLong previousStart_ns = new AtomicLong(startAt.getNano());
 
@@ -67,7 +83,7 @@ class FixRestChannel {
     }
 
     private static Flux<ListThreadsData> listThreads(Function<Map<String, Object>, Mono<ListThreadsData>> doRequest) {
-        ToLongFunction<ListThreadsData> getLastThreadId = { response ->
+        ToInstantFunction<ListThreadsData> getLastThreadId = { response ->
             List<ChannelData> threads = response.threads();
             return threads.isEmpty() ? Long.MAX_VALUE : Snowflake.asLong(threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp());
         }
