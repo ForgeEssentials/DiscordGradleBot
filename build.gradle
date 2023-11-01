@@ -62,7 +62,7 @@ class FixRestChannel {
                 .sort(reverse ? comparator.reversed() : comparator)
                 .collectList()
                 .doOnNext{list -> previousStart.set(updateLast.applyAsLong(list)) }
-                .flatMapMany(Flux::fromIterable)
+                .flatMapMany(Flux.&fromIterable)
                 .repeat { previousStart.get() != startAt.getEpochSecond() && previousStart_ns.get() != startAt.getNano() };
     }
 
@@ -76,7 +76,7 @@ class FixRestChannel {
             parameters.put("limit", 100);
             parameters.put("before", Instant.ofEpochSecond(s, n).toString());
 
-            return doRequest.andThen(Mono::flux).apply(parameters);
+            return doRequest.andThen(Mono.&flux).apply(parameters);
         }
 
         return paginate<ListThreadsData>(nextPage, getLastThreadId, Instant.now(), true);
