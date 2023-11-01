@@ -76,7 +76,7 @@ class FixRestChannel {
             parameters.put("limit", 100);
             parameters.put("before", Instant.ofEpochSecond(s, n).toString());
 
-            return doRequest.andThen(Mono.&flux).apply(parameters);
+            return doRequest.andThen{ it.flux() }.apply(parameters);
         }
 
         return paginate(nextPage, getLastThreadId, Instant.now(), true);
