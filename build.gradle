@@ -17,7 +17,7 @@ import discord4j.core.spec.MessageCreateFields
 import discord4j.core.spec.StartThreadInForumChannelSpec
 import discord4j.discordjson.json.ChannelData
 import discord4j.discordjson.json.ListThreadsData
-import discord4j.rest.util.PaginationUtil
+import discord4j.rest.entity.RestChannel
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import discord4j.core.object.ThreadListPart
@@ -83,7 +83,7 @@ class FixRestChannel {
     }
 }
 
-FixRestChannel.mixin(FixRestChannel)
+RestChannel.mixin(FixRestChannel)
 
 def splitFile(byte[] file, int maxSize=8192) {
 	int parts = (int) Math.ceil((float) file.size() / (1024 * maxSize))
