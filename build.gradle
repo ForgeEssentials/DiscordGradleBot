@@ -79,7 +79,7 @@ class FixRestChannel {
             return doRequest.andThen(Mono.&flux).apply(parameters);
         }
 
-        return paginate<ListThreadsData>(nextPage, getLastThreadId, Instant.now(), true);
+        return paginate(nextPage, getLastThreadId, Instant.now(), true);
     }
 }
 
