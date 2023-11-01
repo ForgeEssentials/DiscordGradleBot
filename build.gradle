@@ -16,8 +16,7 @@ import discord4j.core.spec.ForumThreadMessageCreateSpec
 import discord4j.core.spec.MessageCreateFields
 import discord4j.core.spec.StartThreadInForumChannelSpec
 import reactor.core.publisher.Mono
-import discord4j.gateway.intent.Intent;
-import discord4j.gateway.intent.IntentSet
+import discord4j.core.object.ThreadListPart;
 
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -94,7 +93,14 @@ task publishToDiscord() {
                     def threads = gateway.getGuildById(guildID).block().getActiveThreads().block().threads
                     def threadName = (thirdParty ? org + " -- " : "") + githubRef.split("/", 2)[1]
                     channel = threads.find{ it.name == threadName && it.parentId.get() == tmp.getId()}
-
+                    if (channel == null) {
+                        def aThreads = tmp.restChannel.getPublicArchivedThreads().map(data -> new ThreadListPart(gateway, data)).blockFirst()
+                        def found = aThreads.threads.findAll {it.name == threadName }.sort {a, b -> (b.archiveTimestamp <=> a.archiveTimestamp) }
+                        if (found.size() > 0) {
+                            channel = found.get(0)
+                            channel.edit().withArchived(false).block()
+                        }
+                    }
                     if (channel == null) {
                         channel = tmp.startThread ( StartThreadInForumChannelSpec.builder()
                                 .name(threadName)
