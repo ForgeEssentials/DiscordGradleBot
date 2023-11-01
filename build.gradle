@@ -69,11 +69,11 @@ class FixRestChannel {
                                         final Instant startAt, final boolean reverse) {
 
         final ToLongFunction<List<T>> updateLast = { list ->
-            list.isEmpty() ? startAt : keyExtractor.applyAsInstant(list.get(list.size() - 1)).getEpochSecond()
+            list.isEmpty() ? startAt.getEpochSecond() : keyExtractor.applyAsInstant(list.get(list.size() - 1)).getEpochSecond()
         }
 
         final ToIntFunction<List<T>> updateLast_ns = { list ->
-            list.isEmpty() ? startAt : keyExtractor.applyAsInstant(list.get(list.size() - 1)).getNano()
+            list.isEmpty() ? startAt.getNano() : keyExtractor.applyAsInstant(list.get(list.size() - 1)).getNano()
         }
 
         final Comparator<T> comparator = comparingInstant(keyExtractor);
@@ -91,7 +91,8 @@ class FixRestChannel {
     private static Flux<ListThreadsData> listThreads(Function<Map<String, Object>, Mono<ListThreadsData>> doRequest) {
         ToInstantFunction<ListThreadsData> getLastThreadId = { response ->
             List<ChannelData> threads = response.threads();
-            return threads.isEmpty() ? Instant.ofEpochSecond(0) : Instant.parse(threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp().replace('+00:00', "Z"));
+
+            return (!response.hasMore() || threads.isEmpty()) ? Instant.ofEpochSecond(0) : Instant.parse(threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp().replace('+00:00', "Z"));
         }
         final InstantFunction<Flux<ListThreadsData>> nextPage = { long s, long n ->
             final Map<String, Object> parameters = new HashMap<>(2);
