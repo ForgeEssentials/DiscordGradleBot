@@ -78,7 +78,7 @@ class FixRestChannel {
 
         final Comparator<T> comparator = comparingInstant(keyExtractor);
         final AtomicLong previousStart = new AtomicLong(startAt.getEpochSecond());
-        final AtomicInteger previousStart_ns = new AtomicLong(startAt.getNano());
+        final AtomicInteger previousStart_ns = new AtomicInteger(startAt.getNano());
 
         return Flux.defer { nextPage.apply(previousStart.get(), previousStart_ns.get()) }
                 .sort(reverse ? comparator.reversed() : comparator)
