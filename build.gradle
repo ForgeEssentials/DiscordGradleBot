@@ -15,13 +15,60 @@ import discord4j.core.object.entity.channel.ForumChannel
 import discord4j.core.spec.ForumThreadMessageCreateSpec
 import discord4j.core.spec.MessageCreateFields
 import discord4j.core.spec.StartThreadInForumChannelSpec
+import discord4j.discordjson.json.ChannelData
+import discord4j.discordjson.json.ListThreadsData
+import discord4j.rest.util.PaginationUtil
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import discord4j.core.object.ThreadListPart;
+import discord4j.core.object.ThreadListPart
 
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicLong
+import java.util.function.Function
+import java.util.function.LongFunction
+import java.util.function.ToLongFunction;
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 def discordFileLimit = 25600;
+
+class FixRestChannel {
+
+    private static <T> Flux<T> paginate(final LongFunction<Flux<T>> nextPage, final ToLongFunction<T> keyExtractor,
+                                        final Instant startAt, final boolean reverse) {
+
+        final ToLongFunction<List<T>> updateLast = list ->
+                list.isEmpty() ? startAt : keyExtractor.applyAsLong(list.get(list.size() - 1));
+
+        final Comparator<T> comparator = Comparator.comparingLong(keyExtractor);
+        final AtomicLong previousStart = new AtomicLong(startAt.getEpochSecond());
+
+        return Flux.defer(() -> nextPage.apply(previousStart.get()))
+                .sort(reverse ? comparator.reversed() : comparator)
+                .collectList()
+                .doOnNext(list -> previousStart.set(updateLast.applyAsLong(list)))
+                .flatMapMany(Flux::fromIterable)
+                .repeat(() -> previousStart.get() != startAt.getEpochSecond());
+    }
+
+    public Flux<ListThreadsData> listThreads(Function<Map<String, Object>, Mono<ListThreadsData>> doRequest) {
+        ToLongFunction<ListThreadsData> getLastThreadId = response -> {
+            List<ChannelData> threads = response.threads();
+            return threads.isEmpty() ? Long.MAX_VALUE : Snowflake.asLong(threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp());
+        };
+        final LongFunction<Flux<T>> nextPage = id -> {
+            final Map<String, Object> parameters = new HashMap<>(2);
+            parameters.put("limit", 100);
+            parameters.put("before", id);
+
+            return doRequest.andThen(Mono::flux).apply(parameters);
+        };
+
+        return paginate<ListThreadsData>(nextPage, getLastThreadId, Instant.now(), true);
+    }
+}
+
+FixRestChannel.mixin(FixRestChannel)
 
 def splitFile(byte[] file, int maxSize=8192) {
 	int parts = (int) Math.ceil((float) file.size() / (1024 * maxSize))
@@ -94,6 +141,7 @@ task publishToDiscord() {
                     def threadName = (thirdParty ? org + " -- " : "") + githubRef.split("/", 2)[1]
                     channel = threads.find{ it.name == threadName && it.parentId.get() == tmp.getId()}
                     if (channel == null) {
+
                         def aThreads = tmp.restChannel.getPublicArchivedThreads().map{data -> new ThreadListPart(gateway, data)}.blockFirst()
                         def found = aThreads.threads.findAll {it.name == threadName }.sort {a, b -> (b.archiveTimestamp <=> a.archiveTimestamp) }
                         if (found.size() > 0) {
