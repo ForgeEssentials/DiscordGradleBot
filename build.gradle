@@ -32,37 +32,52 @@ import java.util.zip.ZipOutputStream
 
 def discordFileLimit = 25600;
 
+@FunctionalInterface
+interface InstantFunction<R> {
+
+    /**
+     * Applies this function to the given argument.
+     *
+     * @param value the function argument
+     * @return the function result
+     */
+    R apply(long s, long n)
+}
+
+
 class FixRestChannel {
 
-    private static <T> Flux<T> paginate(final LongFunction<Flux<T>> nextPage, final ToLongFunction<T> keyExtractor,
+    private static <T> Flux<T> paginate(final InstantFunction<Flux<T>> nextPage, final ToLongFunction<T> keyExtractor,
                                         final Instant startAt, final boolean reverse) {
 
-        final ToLongFunction<List<T>> updateLast = list ->
-                list.isEmpty() ? startAt : keyExtractor.applyAsLong(list.get(list.size() - 1));
+        final ToLongFunction<List<T>> updateLast = { list ->
+            list.isEmpty() ? startAt : keyExtractor.applyAsLong(list.get(list.size() - 1));
+        }
 
         final Comparator<T> comparator = Comparator.comparingLong(keyExtractor);
         final AtomicLong previousStart = new AtomicLong(startAt.getEpochSecond());
+        final AtomicLong previousStart_ns = new AtomicLong(startAt.getNano());
 
-        return Flux.defer(() -> nextPage.apply(previousStart.get()))
+        return Flux.defer { nextPage.apply(previousStart.get(), previousStart_ns.get()) }
                 .sort(reverse ? comparator.reversed() : comparator)
                 .collectList()
-                .doOnNext(list -> previousStart.set(updateLast.applyAsLong(list)))
+                .doOnNext{list -> previousStart.set(updateLast.applyAsLong(list)) }
                 .flatMapMany(Flux::fromIterable)
-                .repeat(() -> previousStart.get() != startAt.getEpochSecond());
+                .repeat { previousStart.get() != startAt.getEpochSecond() && previousStart_ns.get() != startAt.getNano() };
     }
 
     public Flux<ListThreadsData> listThreads(Function<Map<String, Object>, Mono<ListThreadsData>> doRequest) {
-        ToLongFunction<ListThreadsData> getLastThreadId = response -> {
+        ToLongFunction<ListThreadsData> getLastThreadId = { response ->
             List<ChannelData> threads = response.threads();
             return threads.isEmpty() ? Long.MAX_VALUE : Snowflake.asLong(threads.get(threads.size() - 1).threadMetadata().get().archiveTimestamp());
-        };
-        final LongFunction<Flux<T>> nextPage = id -> {
+        }
+        final InstantFunction<Flux<ListThreadsData>> nextPage = { long s, long n ->
             final Map<String, Object> parameters = new HashMap<>(2);
             parameters.put("limit", 100);
-            parameters.put("before", id);
+            parameters.put("before", Instant.ofEpochSecond(s, n).toString());
 
             return doRequest.andThen(Mono::flux).apply(parameters);
-        };
+        }
 
         return paginate<ListThreadsData>(nextPage, getLastThreadId, Instant.now(), true);
     }
