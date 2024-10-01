@@ -180,7 +180,8 @@ task publishToDiscord() {
                 def guildID = Snowflake.of(tmp.data.guildId().get())
                 if (tmp instanceof ForumChannel) {
                     def threads = gateway.getGuildById(guildID).block().getActiveThreads().block().threads
-                    def threadName = (thirdParty ? org + " -- " : "") + githubRef.split("/", 2)[1]
+                    def branch = githubRef.split("/", 2)[1];
+                    def threadName = (thirdParty ? org + " -- " : "") + branch
                     channel = threads.find{ it.name == threadName && it.parentId.get() == tmp.getId()}
                     if (channel == null) {
 
@@ -192,14 +193,16 @@ task publishToDiscord() {
                         }
                     }
                     if (channel == null) {
-                        channel = tmp.startThread ( StartThreadInForumChannelSpec.builder()
-                                .name(threadName)
-                                .addAppliedTag(tmp.availableTags.find {it.name == "Build"}.id)
-                                .message(ForumThreadMessageCreateSpec.builder()
-                                        .content("Builds for Ref: $githubRef")
-                                        .build())
-                                .build()
-                        ).block()
+                        def builder = StartThreadInForumChannelSpec.builder()
+                            .name(threadName)
+                            .addAppliedTag(tmp.availableTags.find {it.name == "Build"}.id)
+                            .message(ForumThreadMessageCreateSpec.builder()
+                                    .content("Builds for Ref: $githubRef")
+                                    .build())
+                        if (branch.endsWith("develop")) {
+                            builder.addAppliedTag(tmp.availableTags.find {it.name == "Stable"}.id)
+                        }
+                        channel = tmp.startThread (builder.build()).block()
                     }
                 } else {
                     channel = tmp as MessageChannel
