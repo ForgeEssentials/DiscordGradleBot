@@ -32,7 +32,7 @@ import java.util.function.ToLongFunction;
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-def discordFileLimit = 25600;
+def discordFileLimit = 10240;
 
 @FunctionalInterface
 interface InstantFunction<R> {
